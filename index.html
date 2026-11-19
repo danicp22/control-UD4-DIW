@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CarTuner Garaje · Configura el CT Concept en 3D</title>
+  <meta name="description" content="Configurador 3D de CarTuner: cambia el color, las llantas, las lunas y la altura del CT Concept, abre las puertas, arranca el motor y consulta qué necesita homologación en España.">
+  <meta name="author" content="Daniel Calvé Pardo">
+  <link rel="icon" href="img/icono.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
+      }
+    }
+  </script>
+  <script type="module" src="js/configurador.js"></script>
+</head>
+<body>
+  <a class="saltar" href="#garaje">Saltar al configurador</a>
+
+  <header class="cabecera">
+    <a class="marca" href="#garaje">CARTUNER <span>Garaje</span></a>
+    <nav aria-label="Secciones">
+      <ul>
+        <li><a href="#garaje">Configurador</a></li>
+        <li><a href="#homologacion">Homologación</a></li>
+        <li><a href="#modelo">El modelo</a></li>
+        <li><a href="#como-funciona">Cómo funciona</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="garaje" id="garaje" aria-label="Configurador 3D">
+
+      <!-- ================= escenario 3D ================= -->
+      <div class="escenario">
+        <canvas id="lienzo" role="img" aria-label="Vista 3D del CT Concept. Arrastra para girarlo y usa la rueda del ratón para acercarte."></canvas>
+
+        <div class="carga" id="carga">
+          <p class="carga-marca">CARTUNER</p>
+          <div class="carga-linea"><span id="carga-barra"></span></div>
+          <p class="carga-texto"><span>Cargando CT Concept</span> <span id="carga-mb">0 / 5,6 MB</span></p>
+        </div>
+
+        <div class="hud-coche">
+          <p class="etiqueta">Coche</p>
+          <h1>CT Concept</h1>
+          <p class="fino">CarTuner Originals · 2026</p>
+        </div>
+
+        <div class="hud-historial">
+          <!-- Mismo comportamiento que el ejemplo de la unidad: history.back() / history.forward() -->
+          <button id="atras" class="btn-icono" type="button" onclick="history.back()" disabled aria-label="Deshacer el último cambio" title="Deshacer">↶</button>
+          <button id="adelante" class="btn-icono" type="button" onclick="history.forward()" disabled aria-label="Rehacer" title="Rehacer">↷</button>
+        </div>
+
+        <div class="hud-total">
+          <p class="etiqueta">Tu build</p>
+          <p class="total num" id="total-hud">0 €</p>
+          <p class="fino" id="resumen-hud">Coche de serie, sin cambios</p>
+        </div>
+
+        <div class="vistas" role="group" aria-label="Cámara">
+          <button type="button" class="vista activa" data-vista="exterior">3/4</button>
+          <button type="button" class="vista" data-vista="lateral">Lateral</button>
+          <button type="button" class="vista" data-vista="frontal">Frontal</button>
+          <button type="button" class="vista" data-vista="trasera">Trasera</button>
+          <button type="button" class="vista" data-vista="interior">Interior</button>
+        </div>
+
+        <div class="cuentarrevoluciones" id="cuentarrevoluciones" hidden>
+          <svg viewBox="0 0 200 116" aria-hidden="true">
+            <path class="cr-arco" d="M20,100 A80,80 0 0 1 180,100"/>
+            <path class="cr-rojo" d="M166.5,55.6 A80,80 0 0 1 180,100"/>
+            <g class="cr-marcas">
+              <text x="38" y="104">0</text><text x="56" y="60">2</text>
+              <text x="100" y="42">4</text><text x="144" y="60">6</text><text x="162" y="104">8</text>
+            </g>
+            <line class="cr-aguja" id="aguja" x1="100" y1="100" x2="30" y2="100"/>
+            <circle cx="100" cy="100" r="6" class="cr-eje"/>
+          </svg>
+          <p><span class="num" id="rpm">0</span> rpm</p>
+        </div>
+
+        <div class="mandos" role="group" aria-label="Acciones">
+          <button type="button" class="mando" id="btn-puertas" aria-pressed="false" onclick="alternarPuertas()">Puertas</button>
+          <button type="button" class="mando" id="btn-capo" aria-pressed="false" onclick="alternarCapo()">Capó</button>
+          <button type="button" class="mando" id="btn-luces" aria-pressed="false" onclick="alternarLuces()">Luces</button>
+          <button type="button" class="mando mando-motor" id="btn-motor" aria-pressed="false" onclick="alternarMotor()">Arrancar</button>
+          <button type="button" class="mando" id="btn-acelerar" onclick="acelerar()" disabled>Acelerar</button>
+          <button type="button" class="mando" id="btn-giro" aria-pressed="false" onclick="alternarGiro()">360°</button>
+        </div>
+
+        <p class="aviso" id="aviso" role="status" aria-live="polite"></p>
+      </div>
+
+      <!-- ================= panel de opciones ================= -->
+      <aside class="panel" aria-label="Opciones del coche">
+        <div class="pestanas" role="tablist" aria-label="Categorías">
+          <button type="button" role="tab" id="tab-exterior" aria-controls="pan-exterior" aria-selected="true">Exterior</button>
+          <button type="button" role="tab" id="tab-ruedas" aria-controls="pan-ruedas" aria-selected="false" tabindex="-1">Ruedas</button>
+          <button type="button" role="tab" id="tab-lunas" aria-controls="pan-lunas" aria-selected="false" tabindex="-1">Lunas</button>
+          <button type="button" role="tab" id="tab-suspension" aria-controls="pan-suspension" aria-selected="false" tabindex="-1">Altura</button>
+        </div>
+
+        <div id="opciones" class="opciones">
+          <div class="pan" role="tabpanel" id="pan-exterior" aria-labelledby="tab-exterior">
+            <fieldset>
+              <legend>Color de carrocería</legend>
+              <div class="muestras">
+                <label class="muestra"><input data-hex="#8f0d10" type="radio" name="carroceria" value="carmin" checked><span></span><em>Carmín</em></label>
+                <label class="muestra"><input data-hex="#0b0c0e" type="radio" name="carroceria" value="negro"><span></span><em>Negro noche</em></label>
+                <label class="muestra"><input data-hex="#e7e8e6" type="radio" name="carroceria" value="glaciar"><span></span><em>Blanco glaciar</em></label>
+                <label class="muestra"><input data-hex="#7d8285" type="radio" name="carroceria" value="circuito"><span></span><em>Gris circuito</em></label>
+                <label class="muestra"><input data-hex="#2f3236" type="radio" name="carroceria" value="grafito"><span></span><em>Grafito</em></label>
+                <label class="muestra"><input data-hex="#11264a" type="radio" name="carroceria" value="abisal"><span></span><em>Azul abisal</em></label>
+                <label class="muestra"><input data-hex="#123526" type="radio" name="carroceria" value="racing"><span></span><em>Verde racing</em></label>
+                <label class="muestra"><input data-hex="#d2531a" type="radio" name="carroceria" value="senal"><span></span><em>Naranja señal</em></label>
+                <label class="muestra"><input data-hex="#b8a27e" type="radio" name="carroceria" value="duna"><span></span><em>Duna</em></label>
+                <label class="muestra"><input data-hex="#3b2160" type="radio" name="carroceria" value="ultravioleta"><span></span><em>Ultravioleta</em></label>
+              </div>
+              <p class="fino">De serie: carmín. Cualquier otro color se presupuesta como vinilado completo.</p>
+            </fieldset>
+
+            <fieldset>
+              <legend>Paneles de acento</legend>
+              <p class="fino">Techo, taloneras y carcasas de los retrovisores.</p>
+              <div class="tarjetas">
+                <label class="tarjeta"><input type="radio" name="acento" value="negro" checked data-hex="#141518" data-rugosidad="0.25"><strong>Negro brillo</strong><small>De serie</small></label>
+                <label class="tarjeta"><input type="radio" name="acento" value="carroceria"><strong>Color carrocería</strong><small>Todo del mismo tono</small></label>
+                <label class="tarjeta"><input type="radio" name="acento" value="mate" data-hex="#1b1c1e" data-rugosidad="0.85"><strong>Negro mate</strong><small>Vinilo satinado</small></label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="pan" role="tabpanel" id="pan-ruedas" aria-labelledby="tab-ruedas" hidden>
+            <fieldset>
+              <legend>Acabado de las llantas</legend>
+              <div class="muestras">
+                <label class="muestra"><input data-hex="#0e0f11" type="radio" name="llantas" value="negro" checked data-metal="0.5" data-rugosidad="0.18"><span></span><em>Negro brillo</em></label>
+                <label class="muestra"><input data-hex="#c9ccd1" type="radio" name="llantas" value="plata" data-metal="0.95" data-rugosidad="0.28"><span></span><em>Plata</em></label>
+                <label class="muestra"><input data-hex="#4b4f55" type="radio" name="llantas" value="gunmetal" data-metal="0.9" data-rugosidad="0.33"><span></span><em>Gunmetal</em></label>
+                <label class="muestra"><input data-hex="#8c6a3d" type="radio" name="llantas" value="bronce" data-metal="1" data-rugosidad="0.34"><span></span><em>Bronce satinado</em></label>
+                <label class="muestra"><input data-hex="#eceef0" type="radio" name="llantas" value="pulido" data-metal="1" data-rugosidad="0.05"><span></span><em>Pulido</em></label>
+                <label class="muestra"><input data-hex="#e6e4de" type="radio" name="llantas" value="blanco" data-metal="0.05" data-rugosidad="0.42"><span></span><em>Blanco satinado</em></label>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Pinzas de freno</legend>
+              <div class="muestras">
+                <label class="muestra"><input data-hex="#a3080b" type="radio" name="pinzas" value="rojo" checked><span></span><em>Rojo carrera</em></label>
+                <label class="muestra"><input data-hex="#d9a400" type="radio" name="pinzas" value="amarillo"><span></span><em>Amarillo señal</em></label>
+                <label class="muestra"><input data-hex="#111214" type="radio" name="pinzas" value="negro"><span></span><em>Negro</em></label>
+                <label class="muestra"><input data-hex="#173d8f" type="radio" name="pinzas" value="azul"><span></span><em>Azul profundo</em></label>
+                <label class="muestra"><input data-hex="#a9adb2" type="radio" name="pinzas" value="plata"><span></span><em>Plata</em></label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="pan" role="tabpanel" id="pan-lunas" aria-labelledby="tab-lunas" hidden>
+            <fieldset>
+              <legend>Láminas tintadas</legend>
+              <div class="tarjetas">
+                <label class="tarjeta"><input type="radio" name="lunas" value="ninguna" checked data-traseras="0" data-delanteras="0"><strong>Sin lámina</strong><small>De serie</small></label>
+                <label class="tarjeta"><input type="radio" name="lunas" value="claro" data-traseras="0.55" data-delanteras="0"><strong>Traseras 35 %</strong><small>Lámina homologada en lunas traseras</small></label>
+                <label class="tarjeta"><input type="radio" name="lunas" value="oscuro" data-traseras="0.92" data-delanteras="0"><strong>Traseras 5 %</strong><small>Lámina homologada en lunas traseras</small></label>
+                <label class="tarjeta tarjeta-peligro"><input type="radio" name="lunas" value="todas" data-traseras="0.92" data-delanteras="0.92"><strong>Todas oscuras</strong><small>Incluye parabrisas y ventanillas delanteras</small></label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="pan" role="tabpanel" id="pan-suspension" aria-labelledby="tab-suspension" hidden>
+            <fieldset>
+              <legend>Altura de la carrocería</legend>
+              <div class="tarjetas">
+                <label class="tarjeta"><input type="radio" name="altura" value="0" checked><strong>De serie</strong><small>Altura de fábrica</small></label>
+                <label class="tarjeta"><input type="radio" name="altura" value="30"><strong>Rebajada 30 mm</strong><small>Muelles más cortos</small></label>
+                <label class="tarjeta"><input type="radio" name="altura" value="50"><strong>Rebajada 50 mm</strong><small>Coilovers regulables</small></label>
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
+        <!-- ================= presupuesto ================= -->
+        <section class="presupuesto" aria-labelledby="t-presupuesto">
+          <div class="presupuesto-cab">
+            <h2 id="t-presupuesto" class="etiqueta">Presupuesto</h2>
+            <p class="total num" id="total">0 €</p>
+          </div>
+          <p class="fino" id="rango">Coche de serie, sin cambios.</p>
+          <ol class="lineas" id="lineas"></ol>
+          <div class="acciones">
+            <button type="button" class="btn btn-fantasma" id="btn-compartir">Copiar enlace</button>
+            <button type="button" class="btn btn-fantasma" id="btn-captura">Capturar imagen</button>
+            <button type="button" class="btn btn-principal" onclick="restablecer()">Volver a serie</button>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <!-- sonidos del motor: los controla el JavaScript, sin reproductor visible -->
+    <audio id="snd-arranque" preload="auto"><source src="audio/arranque.ogg" type="audio/ogg"><source src="audio/arranque.mp3" type="audio/mpeg"></audio>
+    <audio id="snd-ralenti" preload="auto" loop><source src="audio/ralenti.ogg" type="audio/ogg"><source src="audio/ralenti.mp3" type="audio/mpeg"></audio>
+    <audio id="snd-aceleron" preload="auto"><source src="audio/aceleron.ogg" type="audio/ogg"><source src="audio/aceleron.mp3" type="audio/mpeg"></audio>
+    <audio id="snd-apagado" preload="auto"><source src="audio/apagado.ogg" type="audio/ogg"><source src="audio/apagado.mp3" type="audio/mpeg"></audio>
+
+    <!-- ================= información ================= -->
+    <div class="info">
+      <section id="homologacion" aria-labelledby="t-homologacion">
+        <p class="etiqueta">Antes de pasar la ITV</p>
+        <h2 id="t-homologacion">¿Qué hay que homologar en España?</h2>
+        <p class="intro">Cada línea del presupuesto lleva una etiqueta con su situación legal. Aquí está el detalle de cada caso.</p>
+
+        <details>
+          <summary>Cambiar el color: pintura o vinilo</summary>
+          <p>Cambiar el color del coche, ya sea pintándolo o con un vinilado completo, <strong>no es una reforma</strong>. Si el color aparece en la tarjeta ITV, se anota el cambio.</p>
+          <p>En 2026, un vinilado completo cuesta de media entre 1.500 y 3.000 €, aunque los hay desde unos 650 €. Vinilar solo el techo y las taloneras sale por unos 4 m² de vinilo, a 25–50 € el m².</p>
+          <p class="fuente">Fuentes: RACE (2026), MuchoNeumático (2026), Mapfre Motor (2022) y Coches.com.</p>
+        </details>
+
+        <details>
+          <summary>Llantas y pinzas de freno</summary>
+          <p>Pintar las llantas o las pinzas <strong>no es una reforma</strong>, porque no cambia ninguna medida ni el sistema de frenos.</p>
+          <p>Cambiar las llantas por otras tampoco lo es si se mantienen el diámetro, el bombeo y unos neumáticos equivalentes: mismos índices de carga y velocidad o mayores, y diámetro dentro del 3 % (código 4.4). Cambiar piezas del freno sí sería reforma (código 7.1).</p>
+          <p class="fuente">Fuentes: CIMALAB y Manual de Reformas (BOE-A-2026-2709).</p>
+        </details>
+
+        <details>
+          <summary>Lunas tintadas</summary>
+          <p>Solo se pueden tintar <strong>la luna trasera y las ventanillas traseras</strong>, con una lámina homologada que lleve su certificado y su marcado. Así no es reforma y se revisa en la ITV periódica.</p>
+          <p>En el parabrisas y en las ventanillas del conductor y del copiloto <strong>no está permitido</strong>. Por eso la opción «Todas oscuras» aparece marcada como no legal.</p>
+          <p>Laminar las lunas traseras cuesta entre 70 y 150 € en un compacto, y hasta 300 € según el coche.</p>
+          <p class="fuente">Fuentes: TÜV SÜD, Testcoches y Zurich.</p>
+        </details>
+
+        <details>
+          <summary>Rebajar la suspensión</summary>
+          <p>Bajar la altura con muelles, coilovers o suspensión neumática <strong>es una reforma</strong>: la 5.1 del Manual de Reformas. Hacen falta proyecto técnico, certificado final de obra, informe de conformidad y certificado de taller, y después pasar la ITV.</p>
+          <p>La homologación cuesta de media 240 €, entre 150 y 600 €. Los muelles de referencia (H&amp;R, 2021) costaban 354 €.</p>
+          <p class="fuente">Fuentes: TFG de la UMH sobre el Manual de Reformas, Certicalia (2025) y Auto Bild (2021).</p>
+        </details>
+
+        <p class="nota">Información orientativa. Antes de modificar tu coche, confírmalo con tu estación ITV o con un ingeniero homologador.</p>
+      </section>
+
+      <section id="modelo" aria-labelledby="t-modelo">
+        <p class="etiqueta">El modelo 3D</p>
+        <h2 id="t-modelo">Ficha del CT Concept</h2>
+        <details open>
+          <summary>Datos del modelo</summary>
+          <dl class="ficha">
+            <div><dt>Tipo</dt><dd>Prototipo deportivo de dos puertas</dd></div>
+            <div><dt>Formato</dt><dd>glTF binario (.glb), 5,6 MB</dd></div>
+            <div><dt>Mallas</dt><dd>97</dd></div>
+            <div><dt>Materiales</dt><dd>23, con capa de barniz, cristal transparente y luces que brillan</dd></div>
+            <div><dt>Texturas</dt><dd>13, en formato WebP</dd></div>
+            <div><dt>Piezas móviles</dt><dd>Dos puertas de tijera, capó y cuatro ruedas</dd></div>
+          </dl>
+        </details>
+        <details>
+          <summary>Créditos y licencias</summary>
+          <ul class="creditos">
+            <li><strong>Modelo 3D:</strong> <a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept">Car Concept</a> de Eric Chadwick, © 2024 Darmstadt Graphics Group GmbH, con licencia <a href="https://creativecommons.org/licenses/by/4.0/deed.es">CC BY 4.0</a>. Modificado: los colores, las lunas y las piezas móviles se cambian en tiempo real.</li>
+            <li><strong>Motor 3D:</strong> <a href="https://threejs.org">Three.js</a> r187, licencia MIT (incluida en <code>vendor/three/LICENSE</code>).</li>
+            <li><strong>Tipografías:</strong> Michroma y Archivo, licencia SIL Open Font License 1.1.</li>
+            <li><strong>Sonidos del motor:</strong> sintetizados por código para este proyecto.</li>
+            <li><strong>Diseño, código y datos:</strong> Daniel Calvé Pardo, a partir del proyecto CarTuner.</li>
+          </ul>
+        </details>
+      </section>
+
+      <section id="como-funciona" aria-labelledby="t-como">
+        <p class="etiqueta">Para el profesor</p>
+        <h2 id="t-como">Cómo funciona: evento y acción</h2>
+        <details>
+          <summary>Todos los comportamientos de la página</summary>
+          <div class="tabla-scroll">
+            <table>
+              <thead><tr><th scope="col">Elemento</th><th scope="col">Evento</th><th scope="col">Acción</th><th scope="col">Cómo</th></tr></thead>
+              <tbody>
+                <tr><td>Botones Puertas, Capó, Luces, Arrancar, Acelerar, 360°</td><td>click</td><td>Abre, enciende o arranca y cambia el estado del botón</td><td>Atributo <code>onclick</code></td></tr>
+                <tr><td>Deshacer y rehacer</td><td>click</td><td><code>history.back()</code> y <code>history.forward()</code></td><td>Atributo <code>onclick</code></td></tr>
+                <tr><td>Volver a serie</td><td>click</td><td>Quita todas las modificaciones</td><td>Atributo <code>onclick</code></td></tr>
+                <tr><td>Opciones (colores, llantas, lunas, altura)</td><td>change</td><td>Cambia el coche 3D, el presupuesto y la dirección de la página</td><td><code>addEventListener</code></td></tr>
+                <tr><td>Pestañas</td><td>click y teclas ← →</td><td>Muestra el panel de cada categoría</td><td><code>addEventListener</code></td></tr>
+                <tr><td>Vistas de cámara</td><td>click</td><td>Mueve la cámara con una transición</td><td><code>addEventListener</code></td></tr>
+                <tr><td>Coche 3D</td><td>pointerup sobre una pieza</td><td>Puerta: las abre. Capó: lo abre. Rueda o carrocería: abre su pestaña</td><td><code>addEventListener</code> y evento propio <code>pieza</code></td></tr>
+                <tr><td>Sonido de arranque</td><td>ended</td><td>Empieza el ralentí en bucle</td><td><code>addEventListener</code></td></tr>
+                <tr><td>Sonido de acelerón</td><td>play y ended</td><td>Sube la vibración y mueve la aguja del cuentarrevoluciones</td><td><code>addEventListener</code></td></tr>
+                <tr><td>Navegador</td><td>popstate</td><td>Recupera la configuración al deshacer o rehacer</td><td><code>addEventListener</code></td></tr>
+                <tr><td>Muestras, tarjetas, botones y desplegables</td><td>:hover</td><td>Se iluminan, crecen o cambian de color</td><td>CSS</td></tr>
+                <tr><td>Desplegables de esta sección</td><td>click en el título</td><td>Muestran u ocultan el contenido</td><td><code>&lt;details&gt;</code> y <code>&lt;summary&gt;</code>, sin JavaScript</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+        <details>
+          <summary>Comprobar la compatibilidad de este navegador</summary>
+          <p>Pulsa el botón y la página revisa si tu navegador soporta todo lo que usa el configurador.</p>
+          <button type="button" class="btn btn-fantasma" onclick="comprobarCompatibilidad()">Comprobar ahora</button>
+          <p class="fino" id="navegador"></p>
+          <ul class="compat" id="compat"></ul>
+        </details>
+      </section>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <p class="marca">CARTUNER <span>Garaje</span></p>
+    <p>Proyecto de la UD4 «Integración de contenido interactivo» · Diseño de Interfaces Web, 2.º DAW</p>
+    <p>© 2026 Daniel Calvé Pardo</p>
+  </footer>
+</body>
+</html>
